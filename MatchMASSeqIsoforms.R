@@ -67,7 +67,7 @@ df_exons2_grouped$NumberOfExons <- sapply(strsplit(df_exons2_grouped$concatanate
 # Function to create a range from concatenated coordinates
 make_a_range <- function(coordinates) {
 		
-			start_pos <-strsplit(strsplit(coordinates,  ",")[[1]], '-')[[1]][1]
+			start_pos <- strsplit(strsplit(coordinates,  ",")[[1]], '-')[[1]][1]
 			end_pos <- strsplit(strsplit(coordinates,  ",")[[length(coordinates)]], '-')[[1]][2]        
 			df <- data.frame(start_pos = as.integer(start_pos), end_pos = as.integer(end_pos))
 			
@@ -75,15 +75,10 @@ make_a_range <- function(coordinates) {
 		}
 
 # Function to check if two sets of coordinates meet the defined criteria - matching transcript based on max3diff and max5diff
-check_criteria <- function(df1, df2, row) {
-			df2_start_pos <- df2$start_pos[row]
-		      	df2_end_pos <- df2$end_pos[row]
-		        
-		        df1_start_pos <- df1$start_pos[row]
-		        df1_end_pos <- df1$end_pos[row]
+check_criteria <- function(df1, df2) {
 			  
-			start_pos_check <- df2_start_pos >= (df1_start_pos - max5diff) & df2_start_pos <= (df1_start_pos + max5diff)
-			end_pos_check <- df2_end_pos >= (df1_end_pos - max3diff) & df2_end_pos <= (df1_end_pos + max3diff)
+			start_pos_check <- df2$start_pos >= (df1$start_pos - max5diff) & df2$start_pos <= (df1$start_pos + max5diff)
+			end_pos_check <- df2$end_pos >= (df1$end_pos - max3diff) & df2$end_pos <= (df1$end_pos + max3diff)
 			    
 			return(start_pos_check & end_pos_check)
 		    }
@@ -106,16 +101,15 @@ for(each_coordinate in df_exons1_grouped$concatanated_coord) {
 
 	if(length(gene_id1) == 1) {
 				  
-		coordinates <- strsplit(each_coordinate,  ",")[[1]]
-		start_end_pos <- make_a_range(coordinates)
-		number_of_exons <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'NumberOfExons']
+			coordinates <- strsplit(each_coordinate,  ",")[[1]]
+		    start_end_pos <- make_a_range(c(coordinates[1], coordinates[length(coordinates)]))
+			number_of_exons <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'NumberOfExons']
 				
-		# take the coordinates of the transcripts which has equal number of exons
+			  # take the coordinates of the transcripts which has equal number of exons
 
-		transcript_ids <- isoform_gene_names2[isoform_gene_names2$GeneName == gene_id1, 'PBid']
+			transcript_ids <- isoform_gene_names2[isoform_gene_names2$GeneName == gene_id1, 'PBid']
 
-		if(length(transcript_ids) >= 1) {
-			
+			if(length(transcript_ids) >= 1) {
 			transcript2_positions <- df_exons2_grouped[df_exons2_grouped$NumberOfExons == number_of_exons$NumberOfExons & df_exons2_grouped$transcript_id %in% transcript_ids, 'concatanated_coord']
 			    
 
@@ -125,10 +119,10 @@ for(each_coordinate in df_exons1_grouped$concatanated_coord) {
 				      
 				coordinates_transcript2 <- transcript2_positions$concatanated_coord[each_positions]
 			    coordinates2 <- strsplit(coordinates_transcript2,  ",")[[1]]
-				start_end_pos_transcript2 <- make_a_range(coordinates2)
+				start_end_pos_transcript2 <- make_a_range(c(coordinates2[1], coordinates2[length(coordinates2)]))
 				transcript_id2 <- df_exons2_grouped[df_exons2_grouped$concatanated_coord == coordinates_transcript2, 'transcript_id']
 
-				result <- sapply(1:nrow(start_end_pos), function(row) check_criteria(start_end_pos, start_end_pos_transcript2, row))
+				result <- check_criteria(start_end_pos, start_end_pos_transcript2)
 
 				if(isTRUE(unique(result))) {
 					match_ids <- data.frame(
