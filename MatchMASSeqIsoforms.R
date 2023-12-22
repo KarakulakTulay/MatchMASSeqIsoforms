@@ -89,14 +89,13 @@ check_criteria <- function(df1, df2, row) {
 		    }
 
 # Initializing a data frame to store matched IDs
-match_ids_local <- match_ids_local <- data.frame(
-					gene_id = I(vector("list", 0)),
-					transcript1 = I(vector("list", 0)),
-					transcript2 = I(vector("list", 0)),
-					concatanated_coord1 = I(vector("list", 0)),
-					concatanated_coord2 = I(vector("list", 0)),
-					numberOfExons = I(vector("list", 0))
-					)
+match_ids_local <- data.frame(
+			gene_id = I(vector("list", 0)),
+			transcript1 = I(vector("list", 0)),
+			transcript2 = I(vector("list", 0)),
+			concatanated_coord1 = I(vector("list", 0)),
+			concatanated_coord2 = I(vector("list", 0)),
+			numberOfExons = I(vector("list", 0)))
 
 
 # Main loop to process and match coordinates between the two datasets
