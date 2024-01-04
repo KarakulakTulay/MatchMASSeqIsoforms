@@ -1,3 +1,8 @@
+# Author: Tülay Karakulak
+# Created: 29.11.2023
+# Description: The script takes two gff files which are the output of MAS-Seq Iso-Seq workflow and matches the same transcripts based on their exon coordinates with some flexibility.
+
+
 library(rtracklayer)
 library(dplyr)
 library(foreach)
@@ -6,7 +11,7 @@ args <- commandArgs(trailingOnly=TRUE)
 
 # Check if the correct number of arguments (8) is provided
 if(length(args) != 8) {
-	  stop("Please provide the paths for two input GFF files, 2 Seurat genes.tsv, one output file, number of nucleotides flexibility for 5 prime and 3prime")
+	  stop("Please provide the paths for two input GFF files, 2 Seurat genes.tsv, number of nucleotides flexibility for 5 prime and 3prime, output directory and output file")
 }
 
 # Assigning input and output file paths from the arguments
