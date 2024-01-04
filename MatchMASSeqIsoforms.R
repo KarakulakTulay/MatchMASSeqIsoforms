@@ -1,16 +1,11 @@
-# Author: Tülay Karakulak
-# Created: 29.11.2023
-# Description: The script takes two gff files which are the output of MAS-Seq Iso-Seq workflow and matches the same transcripts based on their exon coordinates with some flexibility.
-
-
 library(rtracklayer)
 library(dplyr)
 library(foreach)
 
 args <- commandArgs(trailingOnly=TRUE)
 
-# Check if the correct number of arguments (5) is provided
-if(length(args) != 7) {
+# Check if the correct number of arguments (8) is provided
+if(length(args) != 8) {
 	  stop("Please provide the paths for two input GFF files, 2 Seurat genes.tsv, one output file, number of nucleotides flexibility for 5 prime and 3prime")
 }
 
@@ -19,9 +14,10 @@ input_path1 <- args[1]
 input_path2 <- args[2]
 genes_path1 <- args[3]
 genes_path2 <- args[4]
-output_path <- args[5]
-max5diff <-  as.numeric(args[6]) # Max nucleotide length at the 5' end
-max3diff <- as.numeric(args[7])  # Max nucleotide length at the 3' end
+max5diff <-  as.numeric(args[5])
+max3diff <- as.numeric(args[6])
+output_dir <- args[7]
+output_filename <- args[8]
 
 
 # Importing GFF files
@@ -65,26 +61,50 @@ df_exons1_grouped$NumberOfExons <- sapply(strsplit(df_exons1_grouped$concatanate
 df_exons2_grouped$NumberOfExons <- sapply(strsplit(df_exons2_grouped$concatanated_coord, ","), length)
 
 # Function to create a range from concatenated coordinates
-make_a_range <- function(coordinates) {
-		
-			start_pos <- strsplit(strsplit(coordinates,  ",")[[1]], '-')[[1]][1]
-			end_pos <- strsplit(strsplit(coordinates,  ",")[[length(coordinates)]], '-')[[1]][2]        
-			df <- data.frame(start_pos = as.integer(start_pos), end_pos = as.integer(end_pos))
-			
-			return(df)
-		}
+make_a_range_all <- function(coordinates) {
+    	coords <- strsplit(coordinates, ",")[[1]]
+    	ranges <- lapply(coords, function(coord) {
+        parts <- as.integer(unlist(strsplit(coord, "-")))
+        return(list(start = parts[1], end = parts[2]))
+    })
+    return(ranges)
+}
 
-# Function to check if two sets of coordinates meet the defined criteria - matching transcript based on max3diff and max5diff
-check_criteria <- function(df1, df2) {
-			  
-			start_pos_check <- df2$start_pos >= (df1$start_pos - max5diff) & df2$start_pos <= (df1$start_pos + max5diff)
-			end_pos_check <- df2$end_pos >= (df1$end_pos - max3diff) & df2$end_pos <= (df1$end_pos + max3diff)
-			    
-			return(start_pos_check & end_pos_check)
-		    }
 
-# Initializing a data frame to store matched IDs
-match_ids_local <- data.frame(
+
+check_criteria <- function(ranges1, ranges2) {
+	    # Check if the number of ranges in each list is the same and non-zero
+	 if(length(ranges1) != length(ranges2) || length(ranges1) == 0) {
+		            return(FALSE)
+    }
+
+    # Check first coordinate with flexibility
+	    if(!(ranges2[[1]]$start >= (ranges1[[1]]$start - max5diff) && ranges2[[1]]$start <= (ranges1[[1]]$start + max5diff))) {
+	            return(FALSE)
+        }
+
+        # Check last coordinate with flexibility
+           if(!(ranges2[[length(ranges2)]]$end >= (ranges1[[length(ranges1)]]$end - max3diff) && ranges2[[length(ranges2)]]$end <= (ranges1[[length(ranges1)]]$end + max3diff))) {
+		        return(FALSE)
+
+	   }
+	
+	# check if ranges have sufficient length
+	   if(length(ranges1) < 2 || length(ranges2) <2 ) {
+	  	return(FALSE)
+	   }
+
+        # Check intermediate coordinates for exact match
+        for(i in 2:(length(ranges1) - 1)) {
+		        if(!length(ranges1[[i]]) || !length(ranges2[[i]]) || ranges1[[i]]$start != ranges2[[i]]$start || ranges1[[i]]$end != ranges2[[i]]$end) {
+				            return(FALSE)
+	        }
+	    }
+
+	    return(TRUE)
+}
+
+match_ids_local <-  data.frame(
 			gene_id = I(vector("list", 0)),
 			transcript1 = I(vector("list", 0)),
 			transcript2 = I(vector("list", 0)),
@@ -93,53 +113,62 @@ match_ids_local <- data.frame(
 			numberOfExons = I(vector("list", 0)))
 
 
-# Main loop to process and match coordinates between the two datasets
+
+
+# Open the file and write the header
+output_file_path <- paste0(output_dir, output_filename)  # Adjust the path accordingly
+
+# Specify the file name and extension in the output path
+output_file <- file(output_file_path, open = "wt")
+write.table(x = data.frame(), file = output_file, sep = '\t', row.names = FALSE, col.names = TRUE)
+
 for(each_coordinate in df_exons1_grouped$concatanated_coord) {
-			    	
-	transcript_id1 <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'transcript_id']
-	gene_id1 <- isoform_gene_names1[isoform_gene_names1$PBid == transcript_id1$transcript_id, 'GeneName']
+    transcript_id1 <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'transcript_id']
+    gene_id1 <- isoform_gene_names1[isoform_gene_names1$PBid == transcript_id1$transcript_id, 'GeneName']
 
-	if(length(gene_id1) == 1) {
-				  
-			coordinates <- strsplit(each_coordinate,  ",")[[1]]
-		    start_end_pos <- make_a_range(c(coordinates[1], coordinates[length(coordinates)]))
-			number_of_exons <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'NumberOfExons']
-				
-			  # take the coordinates of the transcripts which has equal number of exons
+    if(length(gene_id1) == 1) {
+        ranges1 <- make_a_range_all(each_coordinate)
 
-			transcript_ids <- isoform_gene_names2[isoform_gene_names2$GeneName == gene_id1, 'PBid']
+    	if(length(ranges1) >= 1) {
 
-			if(length(transcript_ids) >= 1) {
-			transcript2_positions <- df_exons2_grouped[df_exons2_grouped$NumberOfExons == number_of_exons$NumberOfExons & df_exons2_grouped$transcript_id %in% transcript_ids, 'concatanated_coord']
-			    
+        number_of_exons <- df_exons1_grouped[df_exons1_grouped$concatanated_coord == each_coordinate, 'NumberOfExons']
 
-			if(length(transcript2_positions$concatanated_coord) >= 1){
+        transcript_ids <- isoform_gene_names2[isoform_gene_names2$GeneName == gene_id1, 'PBid']
 
-			for(each_positions in 1:length(transcript2_positions$concatanated_coord)) {
-				      
-				coordinates_transcript2 <- transcript2_positions$concatanated_coord[each_positions]
-			    coordinates2 <- strsplit(coordinates_transcript2,  ",")[[1]]
-				start_end_pos_transcript2 <- make_a_range(c(coordinates2[1], coordinates2[length(coordinates2)]))
-				transcript_id2 <- df_exons2_grouped[df_exons2_grouped$concatanated_coord == coordinates_transcript2, 'transcript_id']
+        if(length(transcript_ids) >= 1) {
+            transcript2_positions <- df_exons2_grouped[df_exons2_grouped$NumberOfExons == number_of_exons$NumberOfExons & df_exons2_grouped$transcript_id %in% transcript_ids, 'concatanated_coord']
+            
+            if(length(transcript2_positions$concatanated_coord) >= 1) {
+                for(each_positions in 1:length(transcript2_positions$concatanated_coord)) {
+                    coordinates_transcript2 <- transcript2_positions$concatanated_coord[each_positions]
+                    ranges2 <- make_a_range_all(coordinates_transcript2)
+                    transcript_id2 <- df_exons2_grouped[df_exons2_grouped$concatanated_coord == coordinates_transcript2, 'transcript_id']
 
-				result <- check_criteria(start_end_pos, start_end_pos_transcript2)
+                    result <- check_criteria(ranges1, ranges2)
 
-				if(isTRUE(unique(result))) {
-					match_ids <- data.frame(
-					gene_id = I(list(unique(gene_id1))),
-					transcript1 = I(list(transcript_id1$transcript_id)),
-					transcript2 = I(list(transcript_id2$transcript_id)),
-					concatanated_coord1 = I(list(unique(each_coordinate))),
-					concatanated_coord2 = I(list(unique(coordinates_transcript2))),
-					numberOfExons = I(list(unique(number_of_exons$NumberOfExons))))
-					match_ids_local <- rbind(match_ids_local, match_ids)
-				}
-				}
-			    }
-		    }}}
+                    if(isTRUE(unique(result))) {
+                        match_ids <- data.frame(
+                            gene_id = I(list(unique(gene_id1))),
+                            transcript1 = I(list(transcript_id1$transcript_id)),
+                            transcript2 = I(list(transcript_id2$transcript_id)),
+                            concatanated_coord1 = I(list(unique(each_coordinate))),
+                            concatanated_coord2 = I(list(unique(coordinates_transcript2))),
+                            numberOfExons = I(list(unique(number_of_exons$NumberOfExons)))
+                        )
 
-match_ids_final <- match_ids_local %>% dplyr::distinct()
-# Combine all the data frames in the results list to a single data frame
-write.table(match_ids_final, file = output_path, row.names=FALSE, sep='\t')
-saveRDS(match_ids_final, file = paste0(output_path, ".RDS"))
+		    	# Append the match_ids data frame to the file
+		         write.table(match_ids, file = output_file, sep = '\t', row.names = FALSE, col.names = FALSE, append = TRUE)
+
+                        #match_ids_local <- rbind(match_ids_local, match_ids)
+		}    }
+                }
+            }
+        }
+    }
+}
+
+
+
+# close the file
+close(output_file)
 
