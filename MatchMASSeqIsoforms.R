@@ -1,5 +1,5 @@
 # Author: Tülay Karakulak
-# Created: 29.11.2023
+# Created: 04.01.2024
 # Description: The script takes two gff files which are the output of MAS-Seq Iso-Seq workflow and matches the same transcripts based on their exon coordinates with some flexibility.
 
 
