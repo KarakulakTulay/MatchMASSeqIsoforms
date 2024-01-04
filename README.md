@@ -4,7 +4,7 @@ Iso-Seq pipeline gives different PBids for isoforms even though the isoforms are
 
 #### Example Usage:
 
-`$ Rscript MatchMASSeqIsoforms.R sample1/scisoseq_transcripts.sorted.filtered_lite.gff sample2/scisoseq_transcripts.sorted.filtered_lite.gff sample1/scisoseq.seurat_info/isoforms_seurat/genes.tsv sample2/scisoseq.seurat_info/isoforms_seurat/genes.tsv IsoformMatch.csv max5diff max3diff &> IsoformMatch1.log &
+`$ Rscript MatchMASSeqIsoforms.R sample1/scisoseq_transcripts.sorted.filtered_lite.gff sample2/scisoseq_transcripts.sorted.filtered_lite.gff sample1/scisoseq.seurat_info/isoforms_seurat/genes.tsv sample2/scisoseq.seurat_info/isoforms_seurat/genes.tsv max5diff max3diff Output_dir/ IsoformMatch.csv &> IsoformMatch1.log &
 `
 
 #### Inputs: 
